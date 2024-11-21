@@ -35,24 +35,26 @@ class WorkloadMetric(BaseModel):
     is_static_value: bool = Field(default=False)
     conversion_factor: float = Field(default=1.0)  # For GB conversion etc.
 
-    def calculate(self, measurement: Measurement, start_time: str) -> tuple[float, float]:
-        timestamp_prev = start_time
+    def calculate(self, measurement: Measurement) -> tuple[float, float]:
         total = 0.0
         peak = 0.0
 
-        for item in measurement.values:
-            timestamp = datetime.datetime.fromisoformat(item["timestamp"])
+        # Start measurment time from fist value
+        timestamp_prev = measurement.values[0]["timestamp"]
+
+        for granular in measurement.values:
+            timestamp = datetime.datetime.fromisoformat(granular["timestamp"])
             prev_timestamp = datetime.datetime.fromisoformat(str(timestamp_prev))
             time_diff = (timestamp - prev_timestamp).total_seconds()
 
-            value = float(item["value"])
+            value = float(granular["value"])
             if not self.is_static_value:
                 total += value * time_diff / 3600 * self.conversion_factor
             else:
                 total += value * time_diff / 3600
 
             peak = max(peak, value)
-            timestamp_prev = item["timestamp"]
+            timestamp_prev = granular["timestamp"]
 
         return total, peak
 
@@ -65,9 +67,9 @@ client = RunaiClient(
 
 # # start time 14 days ago in iso format
 end = datetime.datetime.now(datetime.timezone.utc).isoformat()
-start = (datetime.datetime.fromisoformat(end) - datetime.timedelta(days=14)).isoformat()
+start = (datetime.datetime.fromisoformat(end) - datetime.timedelta(days=1)).isoformat()
 
-metrics = ["GPU_ALLOCATION", "GPU_UTILIZATION", "GPU_MEMORY_USAGE_BYTES", "CPU_REQUEST_CORES", "CPU_USAGE_CORES", "CPU_MEMORY_USAGE_BYTES"]
+metrics_types = ["GPU_ALLOCATION", "GPU_UTILIZATION", "GPU_MEMORY_USAGE_BYTES", "CPU_REQUEST_CORES", "CPU_USAGE_CORES", "CPU_MEMORY_USAGE_BYTES"]
 # metrics = ["CPU_REQUEST_CORES", "CPU_USAGE_CORES", "CPU_MEMORY_USAGE_BYTES"]
 # Define metrics configuration
 metrics_config = {
@@ -78,20 +80,22 @@ metrics_config = {
     "CPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="CPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),  # Convert to GB
     "GPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="GPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),  # Convert to GB
 }
-workloads = client.workloads.all(filter_by="name==my-training")["workloads"]
+workloads = client.workloads.all(filter_by="name=@t11")["workloads"]
 print(workloads)
 for workload in workloads:
     print("########################################################################")
+    print(f"Workload Name: {workload['name']}")
     print(f"Workload ID: {workload['id']}")
     print(f"Project: {workload['projectName']}")
     print(f"Project ID: {workload['projectId']}")
-    print(f"User: {workload['submittedBy']}")
+    user = workload['submittedBy'] if "submittedBy" in workload else None
+    print(f"User: {user}")
     print("########################################################################")
     metrics = client.workloads.get_workload_metrics(
         workload_id=workload["id"],
         start=start,
         end=end,
-        metric_type=metrics,
+        metric_type=metrics_types,
         number_of_samples=1000,
     )
     print(metrics)
@@ -108,13 +112,18 @@ for workload in workloads:
     gpu_utilization_peak = 0
     gpu_utilization_average = 0
 # Replace the existing calculation loop with:
-    total_time_hours = (datetime.datetime.fromisoformat(end) - datetime.datetime.fromisoformat(start)).total_seconds() / 3600
-
     for measurement in measurements:
+        print(measurement)
+        if len(measurement["values"]) == 0:
+            print("Empty measurement, skipping..")
+            continue
+        measurement_start_time = measurement["values"][0]["timestamp"]
+        measurement_end_time = measurement["values"][-1]["timestamp"]
+        total_time_hours = (datetime.datetime.fromisoformat(measurement_end_time) - datetime.datetime.fromisoformat(measurement_start_time)).total_seconds() / 3600
         m = Measurement(**measurement)
         if m.type in metrics_config:
             metric = metrics_config[m.type]
-            total, peak = metric.calculate(m, start)
+            total, peak = metric.calculate(m)
             
             if m.type == "CPU_USAGE_CORES":
                 cpu_hours = total

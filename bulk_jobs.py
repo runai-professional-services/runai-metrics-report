@@ -1,4 +1,12 @@
+import random
+import string
 from runai.client import RunaiClient
+
+
+def random_string(length: int):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choices(characters, k=length)).lower()
+
 
 client = RunaiClient(
     client_id="api-test",
@@ -18,11 +26,11 @@ q_t = {
         "backoffLimit": 6,
         "priorityClass": "train",
     }
-for i in range(20):
-    client.training.create(
-        training_name="quickstart",
-        use_given_name_as_prefix=True,
+for i in range(10):
+    print(client.training.create(
+        training_name="quickstart-"+random_string(4),
+        use_given_name_as_prefix=False,
         project_id="4513786",
         cluster_id="461619fd-127a-4cc6-979c-5cd843a37a2d",
         spec=q_t
-    )
+    ))
