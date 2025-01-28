@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "consumption-report.fullname" . }}
+  labels:
+    {{- include "consumption-report.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cron.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: {{ .Chart.Name }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              env:
+                - name: CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-credentials
+                      key: clientId    # The key in the Secret
+                - name: CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-credentials
+                      key: clientSecret
+                - name: BASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-credentials
+                      key: baseUrl
+              args:
+                - /bin/sh
+                - -c
+                - "echo 'Hello, Kubernetes!'"
+          restartPolicy: OnFailure  # Restart the container only if it fails
+

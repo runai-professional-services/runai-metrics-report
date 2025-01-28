@@ -18,6 +18,7 @@
 
 
 import datetime
+import os
 
 from runai.client import RunaiClient
 from pydantic import BaseModel, Field
@@ -60,9 +61,9 @@ class WorkloadMetric(BaseModel):
 
 
 client = RunaiClient(
-    client_id="api-test",
-    client_secret="2I84hkD7HLxL1cPYD5nkBRl6p1EEmCUA",
-    runai_base_url="https://envinaclick.run.ai"
+    client_id=os.getenv('CLIENT_ID'),
+    client_secret=os.getenv('CLIENT_SECRET'),
+    runai_base_url=os.getenv('BASE_URL')
 )
 
 # # start time 14 days ago in iso format
