@@ -12,7 +12,8 @@ spec:
         spec:
           containers:
             - name: {{ .Chart.Name }}
-              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
               env:
                 - name: CLIENT_ID
                   valueFrom:
@@ -29,9 +30,5 @@ spec:
                     secretKeyRef:
                       name: {{ .Release.Name }}-credentials
                       key: baseUrl
-              args:
-                - /bin/sh
-                - -c
-                - "echo 'Hello, Kubernetes!'"
-          restartPolicy: OnFailure  # Restart the container only if it fails
+          restartPolicy: OnFailure
 
