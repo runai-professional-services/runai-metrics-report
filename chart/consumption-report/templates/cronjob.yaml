@@ -14,6 +14,10 @@ spec:
             - name: {{ .Chart.Name }}
               image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - "sh"
+                - "-c"
+                - "echo starting metric collection && python main.py && ls -ltrah"
               env:
                 - name: CLIENT_ID
                   valueFrom:
@@ -30,5 +34,12 @@ spec:
                     secretKeyRef:
                       name: {{ .Release.Name }}-credentials
                       key: baseUrl
+              volumeMounts:
+                - name: metric-storage
+                  mountPath: /mnt/data
+          volumes:
+            - name: metric-storage
+              persistentVolumeClaim:
+                claimName: {{ .Release.Name }}-report-storage
           restartPolicy: OnFailure
 
