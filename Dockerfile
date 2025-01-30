@@ -8,7 +8,9 @@ WORKDIR /app
 
 COPY main.py .
 COPY requirements.txt .
+COPY metrics-consumption.py .
 
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -i https://test.pypi.org/simple/ runapy
 
 CMD ["python", "main.py"]

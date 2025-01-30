@@ -1,5 +1,6 @@
 import datetime
 import csv
+import os
 from runai.configuration import Configuration
 from runai.api_client import ApiClient
 from runai.runai_client import RunaiClient
@@ -42,9 +43,9 @@ class WorkloadMetric(BaseModel):
 
 # Initialize Run:AI client with new syntax
 config = Configuration(
-    client_id="bny",
-    client_secret="QYzFORujCAkQRmOyWNaUByGwCqmvTO6V",
-    runai_base_url="https://vivek-kp.runailabs-cs.com",
+    client_id=os.getenv('CLIENT_ID'),
+    client_secret=os.getenv('CLIENT_SECRET'),
+    runai_base_url=os.getenv('BASE_URL')
 )
 
 client = RunaiClient(ApiClient(config))
@@ -127,11 +128,11 @@ with open(csv_filename, 'w', newline='') as csvfile:
                 metric_type=metrics_types,
                 number_of_samples=1000,
             )
-            
+
             if not hasattr(metrics_response, 'data') or not metrics_response.data:
                 print(f"No metrics data available for workload {workload.get('name', workload_id)}")
                 continue
-                
+
             metrics = metrics_response.data
         except Exception as e:
             print(f"Error fetching metrics for {workload.get('name', workload_id)}: {e}")

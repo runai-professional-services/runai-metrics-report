@@ -11,13 +11,19 @@ spec:
       template:
         spec:
           containers:
+            - name: {{ .Chart.Name }}-volume-permissions
+              image: busybox
+              command: ["sh", "-c", "chmod -R 777 /mnt/data && chown -R 1000:1000 /mnt/data"]
+              volumeMounts:
+                - name: metric-storage
+                  mountPath: /mnt/data
             - name: {{ .Chart.Name }}
               image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               args:
                 - "sh"
                 - "-c"
-                - "echo starting metric collection && python main.py && ls -ltrah"
+                - "echo starting metric collection && python metrics-consumption.py && latest_file=$(ls -t | head -n 1) && cp ${latest_file} /mnt/data"
               env:
                 - name: CLIENT_ID
                   valueFrom:

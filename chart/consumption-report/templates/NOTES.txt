@@ -7,8 +7,10 @@ Get the Job name and set to the JOB_NAME variable
 JOB_NAME=$(kubectl get jobs -o=jsonpath='{.items[?(@.metadata.ownerReferences[*].name=="consumption-consumption-report")].metadata.name}' -n {{ .Release.Namespace }})
 
 Get the pod name of the job
-POD_NAME=$(kubectl get pods --selector=job-name=$JOB_NAME -n {{ .Release.Namespace }})
+POD_NAME=$(kubectl get pods --selector=job-name=$JOB_NAME -n {{ .Release.Namespace }} | awk 'NR>1 {print $1}')
 
+Get the logs from the pod
+kubectl logs -n -n {{ .Release.Namespace }} $POD_NAME
 
-kubectl get jobs $(kubectl get jobs -o=jsonpath='{.items[?(@.metadata.ownerReferences[*].name=="{{ include "consumption-report.fullname" . }}")].metadata.name}') -n {{ .Release.Namespace }}
-kubectl logs -n {{ .Release.Namespace }} --selector=cronjob={{ include "consumption-report.fullname" . }}
+3. How to download the .csv file
+
