@@ -10,7 +10,7 @@ Get the pod name of the job
 POD_NAME=$(kubectl get pods --selector=job-name=$JOB_NAME -n {{ .Release.Namespace }} | awk 'NR>1 {print $1}')
 
 Get the logs from the pod
-kubectl logs -n -n {{ .Release.Namespace }} $POD_NAME
+kubectl logs -n {{ .Release.Namespace }} $POD_NAME
 
-3. How to download the .csv file
-
+3. How to download the .csv file locally
+kubectl -n {{ .Release.Namespace }} cp $POD_NAME:/mnt/data/<csv-file-name> ./<csv-file-name>
