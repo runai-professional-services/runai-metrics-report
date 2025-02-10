@@ -1,0 +1,16 @@
+1. To manually trigger the cronjob run the following:
+kubectl create job consumption-report --from=cronjob/{{ include "consumption-report.fullname" . }}
+
+2. To view the output of the consumption report run the following:
+
+Get the Job name and set to the JOB_NAME variable
+JOB_NAME=$(kubectl get jobs -o=jsonpath='{.items[?(@.metadata.ownerReferences[*].name=="consumption-consumption-report")].metadata.name}' -n {{ .Release.Namespace }})
+
+Get the pod name of the job
+POD_NAME=$(kubectl get pods --selector=job-name=$JOB_NAME -n {{ .Release.Namespace }} | awk 'NR>1 {print $1}')
+
+Get the logs from the pod
+kubectl logs -n {{ .Release.Namespace }} $POD_NAME
+
+3. How to download the .csv file locally
+kubectl -n {{ .Release.Namespace }} cp $POD_NAME:/mnt/data/<csv-file-name> ./<csv-file-name>

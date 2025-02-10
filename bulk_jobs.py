@@ -9,10 +9,10 @@ def random_string(length: int):
 
 
 client = RunaiClient(
-    client_id="api-test",
-    client_secret="2I84hkD7HLxL1cPYD5nkBRl6p1EEmCUA",
-    runai_base_url="https://envinaclick.run.ai",
-    cluster_id="461619fd-127a-4cc6-979c-5cd843a37a2d",
+    client_id="api",
+    client_secret="7GlUoP8mWfndgNSBS6RH00eTQ761mrKT",
+    runai_base_url="https://runai.dilerous.cloud",
+    cluster_id="ce75a5f5-0fc5-48fb-8d2e-68236fbcf417",
 )
 q_t = {
         "image": "gcr.io/run-ai-demo/quickstart-demo",
@@ -30,7 +30,7 @@ for i in range(10):
     print(client.training.create(
         training_name="quickstart-"+random_string(4),
         use_given_name_as_prefix=False,
-        project_id="4513786",
-        cluster_id="461619fd-127a-4cc6-979c-5cd843a37a2d",
+        project_id="4500001",
+        cluster_id="ce75a5f5-0fc5-48fb-8d2e-68236fbcf417",
         spec=q_t
     ))

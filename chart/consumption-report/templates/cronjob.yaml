@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "consumption-report.fullname" . }}
+  labels:
+    {{- include "consumption-report.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cron.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: {{ .Chart.Name }}-volume-permissions
+              image: busybox
+              command: ["sh", "-c", "chmod -R 777 /mnt/data && chown -R 1000:1000 /mnt/data"]
+              volumeMounts:
+                - name: metric-storage
+                  mountPath: /mnt/data
+            - name: {{ .Chart.Name }}
+              image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - "sh"
+                - "-c"
+                - "echo starting metric collection && python metrics-consumption.py && latest_file=$(ls -t | head -n 1) && cp ${latest_file} /mnt/data"
+              env:
+                - name: CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-credentials
+                      key: clientId    # The key in the Secret
+                - name: CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-credentials
+                      key: clientSecret
+                - name: BASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-credentials
+                      key: baseUrl
+              volumeMounts:
+                - name: metric-storage
+                  mountPath: /mnt/data
+          volumes:
+            - name: metric-storage
+              persistentVolumeClaim:
+                claimName: {{ .Release.Name }}-report-storage
+          restartPolicy: OnFailure
+
