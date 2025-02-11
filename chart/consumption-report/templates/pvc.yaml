@@ -4,8 +4,9 @@ kind: PersistentVolumeClaim
 metadata:
   labels:
     app: {{ .Release.Name }}
+    run.ai/cluster-wide: "true"
   name: {{ .Release.Name }}-report-storage
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.persistence.namespace }}
 spec:
   accessModes:
   - {{ .Values.persistence.accessMode }}
