@@ -1,67 +1,83 @@
-# Resource Metrics Calculations
+# Run:AI Metrics Collection Script
 
-## GPU-Related Metrics
+A Python script (`metrics-consumption.py`) for collecting and analyzing resource utilization metrics from Run:AI workloads. The script generates detailed reports about GPU, CPU, and memory usage across projects and workloads.
 
-### GPU Hours
-GPU Hours represent the total time GPUs were allocated to workloads, calculated as:
+## Features
+
+- Collects metrics with 15-second resolution (Prometheus default)
+- Generates three types of reports:
+  - Project Allocations
+  - Utilization Metrics
+  - Suspicious Usage Patterns
+- Supports time-window based collection for optimal data resolution
+- Handles large time ranges efficiently
+
+## Metrics Calculated
+
+### GPU Metrics
 - GPU Hours = Number of GPUs Allocated × Duration of Allocation
-- Example: If a job used 2 GPUs for 5 hours, GPU Hours = 2 × 5 = 10 hours
+- GPU Utilization (Peak and Average)
+- GPU Allocation patterns
 
+### Memory Metrics
+- Memory Hours (GB) = Memory Usage × Duration
+- CPU Memory Usage (Peak and Average)
+- Memory utilization patterns
 
-### GPU Utilization
-GPU Utilization measures how intensively the allocated GPUs were used:
-- Peak Utilization: Highest utilization percentage observed during the workload
-- Average Utilization: Time-weighted average of GPU usage over the workload duration
-- Calculated by sampling GPU usage at intervals and weighting by time period
-- Example: If GPU was 80% utilized for 2 hours and 40% for 1 hour:
-  Average = (80% × 2 + 40% × 1) ÷ 3 = 66.7%
+### CPU Metrics
+- CPU Hours = Number of CPU Cores × Hours Used
+- CPU Utilization (Peak and Average)
+- Core usage patterns
 
-## Memory Metrics
+## Prerequisites
 
-### Memory Hours (GB)
-Memory Hours represent the total memory consumption over time:
-- Calculated by converting memory usage from bytes to gigabytes
-- Each measurement is multiplied by its duration in hours
-- Final value is GB-Hours (memory capacity × time)
-- Example: Using 2GB for 3 hours = 6 GB-Hours
+- Python 3.12
+- Run:AI API access
+- Required Python packages:
+  ```
+  runai
+  pydantic
+  ```
 
-### CPU Memory Usage
-CPU Memory metrics track the RAM usage:
-- Peak Memory: Highest memory usage observed (in GB)
-- Average Memory: Time-weighted average of memory usage
-- Values are converted from bytes to GB for readability
-- Example: If 1.5GB used for 2 hours and 2.5GB for 1 hour:
-  Average = (1.5 × 2 + 2.5 × 1) ÷ 3 = 1.83GB
+## Environment Variables
 
-## CPU Metrics
+Set the following environment variables before running:
+```bash
+export CLIENT_ID="your_client_id"
+export CLIENT_SECRET="your_client_secret"
+export BASE_URL="your_base_url"
+```
 
-### CPU Hours
-CPU Hours measure the total CPU core time consumed:
-- Calculated as number of CPU cores × hours used
-- Based on actual CPU core utilization
-- Example: Using 2 CPU cores at 100% for 4 hours = 8 CPU Hours
+## Output Files
 
-### CPU Utilization
-CPU Utilization tracks how intensively CPU cores were used:
-- Peak Utilization: Maximum number of cores used at any point
-- Average Utilization: Time-weighted average of core usage
-- Example: If using 4 cores at 50% for 2 hours:
-  CPU Hours = 4 × 0.5 × 2 = 4 core-hours
+The script generates three CSV files:
 
-## Project-Level Aggregation
+1. `project_allocations_[date_range].csv`
+   - Project-level resource allocation summary
+   - Includes department, GPU, CPU, and memory metrics
 
-### Project Total Metrics
-For project-level reporting:
-- Total GPUs: Sum of all GPUs allocated across workloads
-- Peak Values: Maximum observed across all workloads
-- Average Values: Weighted average based on workload duration
-- Example: If Project has 3 workloads:
-  - Workload 1: 2 GPUs for 3 hours
-  - Workload 2: 1 GPU for 4 hours
-  - Workload 3: 3 GPUs for 2 hours
-  - Project Total GPU Hours = (2×3) + (1×4) + (3×2) = 14 GPU Hours
+2. `utilization_metrics_[date_range].csv`
+   - Detailed workload-level metrics
+   - Includes GPU hours, memory hours, CPU hours, etc.
 
-### Time Window Considerations
-- Metrics are calculated within the specified time window
-- For running jobs, only the portion within the time window is counted
-- Jobs that finished or started during the window are pro-rated accordingly
+3. `suspicious_metrics_[date_range].csv`
+   - Identifies potential resource utilization issues
+   - Highlights underutilized resources and inefficient patterns
+
+## Calculation Methods
+
+### Time Windows
+- Uses 15-second resolution for data collection
+- Splits long time ranges into manageable windows
+- Each window contains up to 1000 samples
+
+### Resource Calculations
+- GPU Hours: Calculated based on allocation and duration
+- Memory Hours: Tracks GB-hours of memory usage
+- CPU Hours: Measures actual core utilization time
+
+### Suspicious Pattern Detection
+Identifies:
+- GPU allocation without utilization
+- High memory allocation with low usage
+- Long-running jobs with low resource utilization
