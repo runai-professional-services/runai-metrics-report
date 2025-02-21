@@ -7,7 +7,6 @@ USER user
 WORKDIR /app
 
 COPY requirements.txt .
-COPY BNY-metrics.py .
 COPY resource_monitor.py .
 
 RUN pip install --no-cache-dir -r requirements.txt
