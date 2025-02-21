@@ -23,7 +23,7 @@ spec:
               args:
                 - "sh"
                 - "-c"
-                - "echo starting metric collection && python BNY-metrics.py && latest_file=$(ls -t | head -n 1) && cp ${latest_file} /mnt/data"
+                - "echo starting metric collection && python BNY-metrics.py && python resource_monitor.py && latest_file=$(ls -t | head -n 1) && cp ${latest_file} /mnt/data"
               env:
                 - name: CLIENT_ID
                   valueFrom:
