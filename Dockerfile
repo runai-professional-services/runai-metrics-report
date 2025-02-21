@@ -10,6 +10,6 @@ COPY requirements.txt .
 COPY resource_monitor.py .
 
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install -i https://test.pypi.org/simple/ runapy
+RUN pip install -i https://test.pypi.org/simple/ runapy==3.0.0
 
 CMD ["python", "BNY-metrics.py"]
