@@ -20,11 +20,22 @@ spec:
             - name: {{ .Chart.Name }}
               image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
+              {{- if .Values.securityContext }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              {{- end }}
               args:
                 - "sh"
                 - "-c"
-                - "echo starting metric collection && python BNY-metrics.py && python resource_monitor.py && latest_file=$(ls -t | head -n 1) && cp ${latest_file} /mnt/data"
+                - |
+                  cd /mnt/data
+                  echo "starting metric collection"
+                  python /app/resource_monitor.py
               env:
+                {{- if .Values.rootCa.enabled }}
+                - name: SSL_CERT_FILE
+                  value: /etc/ssl/certs/root-ca.crt
+                {{- end }}
                 - name: CLIENT_ID
                   valueFrom:
                     secretKeyRef:
@@ -43,9 +54,24 @@ spec:
               volumeMounts:
                 - name: metric-storage
                   mountPath: /mnt/data
+                {{- if .Values.rootCa.enabled }}
+                - name: root-ca
+                  mountPath: /etc/ssl/certs/root-ca.crt
+                  subPath: runai-ca.pem
+                {{- end }}
           volumes:
             - name: metric-storage
               persistentVolumeClaim:
                 claimName: {{ .Release.Name }}-report-storage
+            {{- if .Values.rootCa.enabled }}
+            - name: runai-ca
+              secret:
+                defaultMode: 420
+                items:
+                - key: runai-ca.pem
+                  path: runai-ca.pem
+                optional: true
+                secretName: {{ .Values.rootCa.secretName }}
+            {{- end }}
           restartPolicy: OnFailure
 
