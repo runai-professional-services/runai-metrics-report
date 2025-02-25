@@ -30,7 +30,7 @@ spec:
                 - |
                   cd {{ .Values.outputDir }}
                   echo "starting metric collection"
-                  python /app/resource_monitor.py
+                  python /app/main.py
               env:
                 {{- if .Values.rootCa.enabled }}
                 - name: SSL_CERT_FILE
