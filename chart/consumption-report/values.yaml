@@ -10,6 +10,9 @@ credentials:
   clientSecret: ""
   baseUrl: ""
 
+# Define the output directory for CSV reports
+outputDir: "/mnt/data"  # Default output directory
+
 cron:
   # Define how often the cron job is ran. Default is every midnight.
   schedule: "0 0 * * *"

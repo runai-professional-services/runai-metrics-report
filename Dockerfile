@@ -7,9 +7,11 @@ USER user
 WORKDIR /app
 
 COPY requirements.txt .
-COPY resource_monitor.py .
+COPY main.py .
 
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install -i https://test.pypi.org/simple/ runapy==3.0.0
 
-CMD ["python", "BNY-metrics.py"]
+# Add default environment variable
+ENV OUTPUT_DIR=/mnt/data
+
+CMD ["python", "main.py"]

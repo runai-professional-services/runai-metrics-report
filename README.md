@@ -35,7 +35,7 @@ A Python script (`metrics-consumption.py`) for collecting and analyzing resource
 - Run:AI API access
 - Required Python packages:
   ```
-  runai
+  runapy
   pydantic
   ```
 
