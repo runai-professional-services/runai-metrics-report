@@ -13,10 +13,10 @@ spec:
           containers:
             - name: {{ .Chart.Name }}-volume-permissions
               image: busybox
-              command: ["sh", "-c", "chmod -R 777 /mnt/data && chown -R 1000:1000 /mnt/data"]
+              command: ["sh", "-c", "chmod -R 777 {{ .Values.outputDir }} && chown -R 1000:1000 {{ .Values.outputDir }}"]
               volumeMounts:
                 - name: metric-storage
-                  mountPath: /mnt/data
+                  mountPath: {{ .Values.outputDir }}
             - name: {{ .Chart.Name }}
               image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -28,9 +28,9 @@ spec:
                 - "sh"
                 - "-c"
                 - |
-                  cd /mnt/data
+                  cd {{ .Values.outputDir }}
                   echo "starting metric collection"
-                  python /app/resource_monitor.py
+                  python /app/main.py
               env:
                 {{- if .Values.rootCa.enabled }}
                 - name: SSL_CERT_FILE
@@ -40,7 +40,7 @@ spec:
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Release.Name }}-credentials
-                      key: clientId    # The key in the Secret
+                      key: clientId
                 - name: CLIENT_SECRET
                   valueFrom:
                     secretKeyRef:
@@ -51,9 +51,11 @@ spec:
                     secretKeyRef:
                       name: {{ .Release.Name }}-credentials
                       key: baseUrl
+                - name: OUTPUT_DIR
+                  value: {{ .Values.outputDir }}
               volumeMounts:
                 - name: metric-storage
-                  mountPath: /mnt/data
+                  mountPath: {{ .Values.outputDir }}
                 {{- if .Values.rootCa.enabled }}
                 - name: root-ca
                   mountPath: /etc/ssl/certs/root-ca.crt
