@@ -14,3 +14,4 @@ kubectl logs -n {{ .Release.Namespace }} $POD_NAME
 
 3. How to download the .csv file locally
 kubectl -n {{ .Release.Namespace }} cp $POD_NAME:/mnt/data/<csv-file-name> ./<csv-file-name>
+
