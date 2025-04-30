@@ -42,26 +42,28 @@
       schedule: "0 0 * * *"
     ```
 
-7. Install the Helm chart with the following command:
+7. Create a new Project in the Run:ai UI called `metrics`. We will use this project namespace to manage easy access to the report files located on the PVC created by the `helm install`.
+
+8. Install the Helm chart with the following command:
 
     ```bash
     helm upgrade -i metrics -n runai-metrics metrics/consumption-report -f metrics.yaml
     ```
 
-8. You should now have the following installed a Cronjob in the `runai-metrics` namespace called `metrics-consumption-report`. You can manually run the cronjob with the following command:
+9. You should now have the following installed a `Cronjob` in the `runai-metrics` namespace called `metrics-consumption-report`. You can manually run the cronjob with the following command:
 
       ```bash
       kubectl -n runai-metrics create job metrics-job-01 --from=cronjob/metrics-consumption-report
       ```
 
-9. You can get the logs from the job to confirm it was successful. 
+10. You can get the logs from the job to confirm it was successful. 
 
     ```bash
     POD=$(kubectl -n runai-metrics get pods | grep -i metrics-job | awk '{print $1}')
     kubectl -n runai-metrics logs $POD --all-containers
     ```
 
-10. During the install NOTES are provided on additional functionality. You can always view the notes by running:
+11. During the install NOTES are provided on additional functionality. You can always view the notes by running:
 
     ```bash
     helm upgrade -i metrics -n runai-metrics metrics/consumption-report -f metrics.yaml --dry-run
