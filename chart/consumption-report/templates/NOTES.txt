@@ -1,17 +1,29 @@
 1. To manually trigger the cronjob run the following:
-kubectl create job consumption-report --from=cronjob/{{ include "consumption-report.fullname" . }}
+kubectl -n {{ .Release.Namespace }} create job metrics-job-01 --from=cronjob/{{ include "consumption-report.fullname" . }}
 
 2. To view the output of the consumption report run the following:
 
 Get the Job name and set to the JOB_NAME variable
-JOB_NAME=$(kubectl get jobs -o=jsonpath='{.items[?(@.metadata.ownerReferences[*].name=="consumption-consumption-report")].metadata.name}' -n {{ .Release.Namespace }})
+JOB_NAME=$(kubectl -n {{ .Release.Namespace }} get jobs -o=jsonpath='{.items[?(@.metadata.ownerReferences[*].name=="metrics-consumption-report")].metadata.name}')
 
 Get the pod name of the job
 POD_NAME=$(kubectl get pods --selector=job-name=$JOB_NAME -n {{ .Release.Namespace }} | awk 'NR>1 {print $1}')
 
 Get the logs from the pod
-kubectl logs -n {{ .Release.Namespace }} $POD_NAME
+kubectl logs -n {{ .Release.Namespace }} $POD_NAME --all-containers
 
-3. How to download the .csv file locally
-kubectl -n {{ .Release.Namespace }} cp $POD_NAME:/mnt/data/<csv-file-name> ./<csv-file-name>
+3. To copy the files from the job.
 
+Download the v2 Run:ai cli.
+https://run-ai-docs.nvidia.com/guides/reference/cli/install-cli
+
+Get the pvc name.
+PVC=$(kubectl -n {{ .Release.Namespace }} get pvc | grep {{ .Release.Name }}-report-storage | awk '{print $1}')
+
+Submit a new workspace using the Run:ai cli.
+runai login
+runai workspace submit metrics -p metrics -i jupyter/scipy-notebook --existing-pvc claimname=$PVC,path=/mnt/data
+
+Copy the `.csv` files to a local folder called `csv`.
+POD=$(kubectl -n {{ .Release.Namespace }} get pods --sort-by=.metadata.creationTimestamp | tail -n 1 | awk '{print $1}')
+kubectl -n {{ .Release.Namespace }} cp $POD:/mnt/data/ ./csv
