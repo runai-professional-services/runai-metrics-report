@@ -270,7 +270,9 @@ def main():
     client_id = os.getenv('CLIENT_ID')
     client_secret = os.getenv('CLIENT_SECRET')
     base_url = os.getenv('BASE_URL')
-    output_dir = os.getenv('OUTPUT_DIR', '/mnt/data')
+    output_dir = os.getenv('OUTPUT_DIR', '/mnt/data') 
+    end_date=datetime.datetime.strptime(os.getenv('END_DATE'),'%d-%m-%Y').replace(tzinfo=datetime.timezone.utc) if os.getenv('END_DATE') else datetime.datetime.now(datetime.timezone.utc)
+    start_date=datetime.datetime.strptime(os.getenv('START_DATE'),'%d-%m-%Y').replace(tzinfo=datetime.timezone.utc) if os.getenv('START_DATE') else end_date - datetime.timedelta(days=7)
 
     if not all([client_id, client_secret, base_url]):
         raise ValueError("Missing required environment variables: CLIENT_ID, CLIENT_SECRET, and BASE_URL must be set")
@@ -285,8 +287,8 @@ def main():
     client = RunaiClient(ThreadedApiClient(config))
 
     # Define the time range
-    end_date = datetime.datetime.now(datetime.timezone.utc)
-    start_date = end_date - datetime.timedelta(days=7)
+    #end_date = datetime.datetime.now(datetime.timezone.utc)
+    #start_date = end_date - datetime.timedelta(days=7)
     end = end_date.isoformat()
     start = start_date.isoformat()
 
