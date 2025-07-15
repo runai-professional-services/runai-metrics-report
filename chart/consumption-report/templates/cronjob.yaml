@@ -53,6 +53,12 @@ spec:
                       key: baseUrl
                 - name: OUTPUT_DIR
                   value: {{ .Values.outputDir }}
+                {{- if (or (index .Values "date-range" "startDate") (index .Values "date-range" "endDate")) }}
+                - name: START_DATE
+                  value: {{ index .Values "date-range" "startDate" | quote }}
+                - name: END_DATE
+                  value: {{ index .Values "date-range" "endDate" | quote }}
+                {{- end }}
               volumeMounts:
                 - name: metric-storage
                   mountPath: {{ .Values.outputDir }}

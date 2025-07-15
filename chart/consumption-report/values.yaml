@@ -3,7 +3,6 @@
 # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
 
-
 # Run:ai application credentials. Please provision a application to provide api access for the script.
 credentials:
   clientId: ""
@@ -16,6 +15,12 @@ outputDir: "/mnt/data"  # Default output directory
 cron:
   # Define how often the cron job is ran. Default is every midnight.
   schedule: "0 0 * * *"
+
+# Define the metrics collection date range. If not set, the script will collect metrics for the last 7 days.
+# Format %d-%m-%Y
+date-range: {}
+#  startDate: "01-01-2025"
+#  endDate: "02-01-2025"
 
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
