@@ -1,9 +1,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "consumption-report.fullname" . }}
+  name: {{ include "metrics-report.fullname" . }}
   labels:
-    {{- include "consumption-report.labels" . | nindent 4 }}
+    {{- include "metrics-report.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.cron.schedule | quote }}
   jobTemplate:

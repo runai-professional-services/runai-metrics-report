@@ -1,10 +1,10 @@
 1. To manually trigger the cronjob run the following:
-kubectl -n {{ .Release.Namespace }} create job metrics-job-01 --from=cronjob/{{ include "consumption-report.fullname" . }}
+kubectl -n {{ .Release.Namespace }} create job metrics-job-01 --from=cronjob/{{ include "metrics-report.fullname" . }}
 
 2. To view the output of the consumption report run the following:
 
 Get the Job name and set to the JOB_NAME variable
-JOB_NAME=$(kubectl -n {{ .Release.Namespace }} get jobs -o=jsonpath='{.items[?(@.metadata.ownerReferences[*].name=="metrics-consumption-report")].metadata.name}')
+JOB_NAME=$(kubectl -n {{ .Release.Namespace }} get jobs -o=jsonpath='{.items[?(@.metadata.ownerReferences[*].name=="metrics-metrics-report")].metadata.name}')
 
 Get the pod name of the job
 POD_NAME=$(kubectl get pods --selector=job-name=$JOB_NAME -n {{ .Release.Namespace }} | awk 'NR>1 {print $1}')

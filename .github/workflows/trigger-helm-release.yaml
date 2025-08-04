@@ -1,19 +1,140 @@
-name: Trigger Helm Chart Release
+name: Release Metrics Report
 
 on:
-  push:
-    branches:
-      - main
+  release:
+    types: [published]
 
 jobs:
-  trigger:
+  release:
+    name: Build and Release
     runs-on: ubuntu-latest
-
     steps:
-      - name: Send Repository Dispatch Event
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install yq
         run: |
-          curl -X POST -H "Authorization: token ${{ secrets.HELM_TRIGGER_TOKEN }}" \
-               -H "Accept: application/vnd.github.everest-preview+json" \
-               https://api.github.com/repos/runai-professional-services/helm-charts/dispatches \
-               -d '{"event_type": "trigger-helm-release"}'
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Update Chart.yaml versions
+        run: |
+          # Get the release tag without 'v' prefix for chart version
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          CHART_VERSION="${RELEASE_TAG#v}"
+          
+          # Update both chart version and appVersion in Chart.yaml
+          yq eval ".version = \"${CHART_VERSION}\"" -i chart/metrics-report/Chart.yaml
+          yq eval ".appVersion = \"${RELEASE_TAG}\"" -i chart/metrics-report/Chart.yaml
+          
+          echo "Updated Chart.yaml:"
+          cat chart/metrics-report/Chart.yaml
+
+      - name: Extract chart info
+        id: chart_info
+        run: |
+          CHART_NAME=$(yq eval '.name' chart/metrics-report/Chart.yaml)
+          CHART_VERSION=$(yq eval '.version' chart/metrics-report/Chart.yaml)
+          echo "CHART_NAME=$CHART_NAME" >> $GITHUB_ENV
+          echo "CHART_VERSION=$CHART_VERSION" >> $GITHUB_ENV
+          echo "chart_name=$CHART_NAME" >> $GITHUB_OUTPUT
+          echo "chart_version=$CHART_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.CHART_NAME }}:${{ env.CHART_VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.CHART_NAME }}:latest
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: latest
+
+      - name: Package Helm Chart
+        run: |
+          helm package chart/metrics-report
+          echo "Created package: $(ls *.tgz)"
+
+      - name: Commit and push Chart.yaml changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add chart/metrics-report/Chart.yaml
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Chart.yaml versions to ${{ github.event.release.tag_name }}"
+            git push
+          fi
+
+      - name: Upload Helm package to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./${{ env.CHART_NAME }}-${{ env.CHART_VERSION }}.tgz
+          asset_name: ${{ env.CHART_NAME }}-${{ env.CHART_VERSION }}.tgz
+          asset_content_type: application/gzip
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup gh-pages directory
+        run: |
+          # Create gh-pages directory structure if it doesn't exist
+          mkdir -p gh-pages
+          cd gh-pages
+          
+          # Initialize if it's a new gh-pages branch
+          if [ ! -f index.yaml ]; then
+            # Create initial index.yaml
+            cat > index.yaml << EOF
+          apiVersion: v1
+          entries: {}
+          generated: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          EOF
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add index.yaml
+            git commit -m "Initialize Helm repository" || true
+          fi
+
+      - name: Update Helm repository
+        run: |
+          # Copy the new chart package to gh-pages
+          cp ${{ env.CHART_NAME }}-${{ env.CHART_VERSION }}.tgz gh-pages/
+          
+          cd gh-pages
+          
+          # Update the Helm repository index
+          helm repo index . --url https://runai-professional-services.github.io/runai-metrics-report
+          
+          # Configure git and commit changes
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Update Helm repository with ${{ env.CHART_NAME }}-${{ env.CHART_VERSION }}" || true
+          git push origin gh-pages
 
