@@ -51,8 +51,8 @@ export BASE_URL="your_base_url"
 **Optional** environment variables to set the date range for metric collection. If the environment variables are not defined the default is the last `7` days. 
 
 ```bash
-export END_DATE = "01-01-2025"
-export START_DATE = "02-01-2025"
+export START_DATE = "01-01-2025"
+export END_DATE = "02-01-2025"
 ```
 
 ## Output Files
@@ -92,7 +92,7 @@ Identifies:
 &nbsp;
 
 # Metrics Report Helm Chart
-This section will guide you through the process of deploying the metrics consumption report as a Helm chart. This will deploy a `PVC` to store the reports and a `Cron` job which will schedule when the report is ran. Additonally there are steps provided to access the reports via a Run:AI workspace.
+This section will guide you through the process of deploying the metrics report as a Helm chart. This will deploy a `PVC` to store the reports and a `Cron` job which will schedule when the report is ran. Additonally there are steps provided to access the reports via a Run:AI workspace.
 
 ## How to install
 
@@ -113,7 +113,7 @@ This section will guide you through the process of deploying the metrics consump
 3. Export the values file and add your application credentials.
 
     ```bash
-    helm show values metrics/consumption-report > metrics.yaml
+    helm show values metrics/metrics-report > metrics.yaml
     ```
 
 4. Create an application. This is used to provide credentials for API access. Here is the documentation on how to create an `application`.
@@ -141,13 +141,13 @@ This section will guide you through the process of deploying the metrics consump
 8. Install the Helm chart with the following command:
 
     ```bash
-    helm upgrade -i metrics -n runai-metrics metrics/consumption-report -f metrics.yaml
+    helm upgrade -i metrics -n runai-metrics metrics/metrics-report -f metrics.yaml
     ```
 
-9. You should now have the following installed a `Cronjob` in the `runai-metrics` namespace called `metrics-consumption-report`. You can manually run the cronjob with the following command:
+9. You should now have the following installed a `Cronjob` in the `runai-metrics` namespace called `metrics-metrics-report`. You can manually run the cronjob with the following command:
 
       ```bash
-      kubectl -n runai-metrics create job metrics-job-01 --from=cronjob/metrics-consumption-report
+      kubectl -n runai-metrics create job metrics-job-01 --from=cronjob/metrics-metrics-report
       ```
 
 10. You can get the logs from the job to confirm it was successful. 
@@ -160,7 +160,7 @@ This section will guide you through the process of deploying the metrics consump
 11. During the install `NOTES` are provided on additional functionality. You can always view the notes by running:
 
     ```bash
-    helm upgrade -i metrics -n runai-metrics metrics/consumption-report -f metrics.yaml --dry-run
+    helm upgrade -i metrics -n runai-metrics metrics/metrics-report -f metrics.yaml --dry-run
     ```
 
 ## How to copy the .csv files locally
@@ -214,7 +214,7 @@ This section will guide you through the process of deploying the metrics consump
     **Optionally** you can specify the exact chart version as shown below.
 
     ```bash
-    helm upgrade metrics -n runai-metrics metrics/consumption-report \
+    helm upgrade metrics -n runai-metrics metrics/metrics-report \
     -f metrics.yaml \
     --version=0.0.4 # If not specified the latest vesions will be used
     ```
