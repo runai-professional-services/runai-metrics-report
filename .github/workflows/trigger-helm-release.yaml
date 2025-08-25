@@ -1,15 +1,40 @@
 name: Trigger Helm Chart Release
 
 on:
-  push:
-    branches:
-      - main
+  release:
+    types: [published]
 
 jobs:
   trigger:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Update Chart.yaml versions
+        run: |
+          # Get the release tag without 'v' prefix for chart version
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          CHART_VERSION="${RELEASE_TAG#v}"
+          
+          # Update both chart version and appVersion in Chart.yaml
+          sed -i "s/^version: .*/version: ${CHART_VERSION}/" chart/consumption-report/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${RELEASE_TAG}\"/" chart/consumption-report/Chart.yaml
+          
+          echo "Updated Chart.yaml:"
+          cat chart/consumption-report/Chart.yaml
+          
+      - name: Commit and push Chart.yaml changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add chart/consumption-report/Chart.yaml
+          git commit -m "Update Chart.yaml versions to ${{ github.event.release.tag_name }}" || exit 0
+          git push
+
       - name: Send Repository Dispatch Event
         run: |
           curl -X POST -H "Authorization: token ${{ secrets.HELM_TRIGGER_TOKEN }}" \
