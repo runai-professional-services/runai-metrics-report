@@ -25,7 +25,7 @@ date-range: {}
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
   repository: bsoper
-  name: metric
+  name: metrics-report
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
