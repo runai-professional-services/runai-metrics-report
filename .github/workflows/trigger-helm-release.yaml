@@ -36,10 +36,13 @@ jobs:
         run: |
           CHART_NAME=$(yq eval '.name' chart/metrics-report/Chart.yaml)
           CHART_VERSION=$(yq eval '.version' chart/metrics-report/Chart.yaml)
+          APP_VERSION=$(yq eval '.appVersion' chart/metrics-report/Chart.yaml)
           echo "CHART_NAME=$CHART_NAME" >> $GITHUB_ENV
           echo "CHART_VERSION=$CHART_VERSION" >> $GITHUB_ENV
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "chart_name=$CHART_NAME" >> $GITHUB_OUTPUT
           echo "chart_version=$CHART_VERSION" >> $GITHUB_OUTPUT
+          echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -57,7 +60,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.CHART_NAME }}:${{ env.CHART_VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.CHART_NAME }}:${{ env.APP_VERSION }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.CHART_NAME }}:latest
 
       - name: Set up Helm
