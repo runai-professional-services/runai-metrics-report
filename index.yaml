@@ -1,3 +1,14 @@
 apiVersion: v1
-entries: {}
-generated: "2025-08-26T19:35:28Z"
+entries:
+  metrics-report:
+  - apiVersion: v2
+    appVersion: v0.1.0
+    created: "2025-08-26T20:29:10.163617846Z"
+    description: A Helm chart for Kubernetes
+    digest: c2f0d01f49cdc1c7f753bcbfacf82b29ed0a924b086ae4d76748716c8e10bf62
+    name: metrics-report
+    type: application
+    urls:
+    - https://runai-professional-services.github.io/runai-metrics-report/metrics-report-0.1.0.tgz
+    version: 0.1.0
+generated: "2025-08-26T20:29:10.163073633Z"
