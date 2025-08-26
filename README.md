@@ -107,7 +107,7 @@ This section will guide you through the process of deploying the metrics report 
 2. Add the metrics repo and perform a Helm update.
 
     ```bash
-    helm repo add metrics https://runai-professional-services.github.io/helm-charts/ && helm repo update
+    helm repo add metrics https://runai-professional-services.github.io/runai-metrics-report && helm repo update
     ```
 
 3. Export the values file and add your application credentials.
