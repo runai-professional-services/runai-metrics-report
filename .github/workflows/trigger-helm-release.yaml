@@ -20,17 +20,15 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Update Chart.yaml versions
+      - name: Verify Chart.yaml versions
         run: |
-          # Get the release tag without 'v' prefix for chart version
+          # Get the release tag for verification
           RELEASE_TAG="${{ github.event.release.tag_name }}"
           CHART_VERSION="${RELEASE_TAG#v}"
           
-          # Update both chart version and appVersion in Chart.yaml
-          yq eval ".version = \"${CHART_VERSION}\"" -i chart/metrics-report/Chart.yaml
-          yq eval ".appVersion = \"${RELEASE_TAG}\"" -i chart/metrics-report/Chart.yaml
-          
-          echo "Updated Chart.yaml:"
+          echo "Release tag: $RELEASE_TAG"
+          echo "Expected chart version: $CHART_VERSION"
+          echo "Current Chart.yaml:"
           cat chart/metrics-report/Chart.yaml
 
       - name: Extract chart info
@@ -71,18 +69,6 @@ jobs:
         run: |
           helm package chart/metrics-report
           echo "Created package: $(ls *.tgz)"
-
-      - name: Commit and push Chart.yaml changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add chart/metrics-report/Chart.yaml
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update Chart.yaml versions to ${{ github.event.release.tag_name }}"
-            git push
-          fi
 
       - name: Upload Helm package to release
         uses: actions/upload-release-asset@v1
