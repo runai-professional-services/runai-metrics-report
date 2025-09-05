@@ -50,6 +50,27 @@ class WorkloadMetric(BaseModel):
         return total_hours, peak, weighted_avg
 
 
+# Login to Run:AI
+def login():  
+    client_id = os.getenv('CLIENT_ID')
+    client_secret = os.getenv('CLIENT_SECRET')
+    base_url = os.getenv('BASE_URL')
+
+    if not all([client_id, client_secret, base_url]):
+        raise ValueError("Missing required environment variables: CLIENT_ID, CLIENT_SECRET, and BASE_URL must be set")
+
+    # Initialize Run:AI client
+    config = Configuration(
+        client_id=client_id,
+        client_secret=client_secret,
+        runai_base_url=base_url
+    )
+
+    client = RunaiClient(ThreadedApiClient(config))
+    return client
+
+
+# Get time windows for optimal metric resolution
 def get_time_windows(start_date, end_date, desired_resolution=15):
     """
     Generate time windows for optimal metric resolution.
@@ -75,6 +96,7 @@ def get_time_windows(start_date, end_date, desired_resolution=15):
     return windows
 
 
+# Detect suspicious patterns in workload metrics
 def detect_suspicious_patterns(workload, metrics_data, actual_start, actual_duration):
     """
     Detect suspicious patterns in workload metrics.
@@ -128,21 +150,38 @@ def detect_suspicious_patterns(workload, metrics_data, actual_start, actual_dura
     return suspicious_patterns
 
 
+# Process a single time window for a workload and return the metrics
 def process_time_window(client, workload_id: str, window_start: datetime, window_end: datetime, metrics_types: list) -> Dict[str, Any]:
     """Process a single time window for a workload and return the metrics"""
     try:
-        metrics_response = client.workloads.workloads.get_workload_metrics(
-            workload_id=workload_id,
-            start=window_start.isoformat(),
-            end=window_end.isoformat(),
-            metric_type=metrics_types,
-            number_of_samples=1000,
-        )
-        return get_response_data(metrics_response)
+        # Split metrics into batches of 10 to avoid API limit
+        max_metrics_per_request = 10
+        all_measurements = []
+        
+        for i in range(0, len(metrics_types), max_metrics_per_request):
+            batch_metrics = metrics_types[i:i + max_metrics_per_request]
+            
+            metrics_response = client.workloads.workloads.get_workload_metrics(
+                workload_id=workload_id,
+                start=window_start.isoformat(),
+                end=window_end.isoformat(),
+                metric_type=batch_metrics,
+                number_of_samples=1000,
+            )
+            
+            batch_data = get_response_data(metrics_response)
+            if batch_data.get("measurements"):
+                all_measurements.extend(batch_data["measurements"])
+        
+        # Return combined results in the same format as original
+        return {"measurements": all_measurements}
+        
     except Exception as e:
         print(f"Error processing window {window_start} to {window_end}: {e}")
         return {}
 
+
+# Process a single workload and return its metrics
 def process_workload(client, workload: dict, start_date: datetime, end_date: datetime, metrics_types: list, metrics_config: dict) -> Dict[str, Any]:
     """Process a single workload and return its metrics"""
     workload_id = workload.get('id')
@@ -173,6 +212,13 @@ def process_workload(client, workload: dict, start_date: datetime, end_date: dat
         "cpu_utilization_avg": 0.0,
         "cpu_memory_peak": 0.0,
         "cpu_memory_avg": 0.0,
+        "gpu_memory_request_gb": 0.0,
+        "cpu_limit_cores": 0.0,
+        "cpu_memory_request_gb": 0.0,
+        "cpu_memory_limit_gb": 0.0,
+        "pod_count": 0.0,
+        "running_pod_count_peak": 0.0,
+        "running_pod_count_avg": 0.0,
         "all_measurement_timestamps": []
     }
 
@@ -227,6 +273,27 @@ def process_workload(client, workload: dict, start_date: datetime, end_date: dat
                             metrics["cpu_memory_peak"] = max(metrics["cpu_memory_peak"], peak * conversion)
                             metrics["cpu_memory_avg"] = weighted_avg * conversion
                             metrics["memory_hours"] += total_hours * conversion
+                        # New metrics processing for versions 2.20+
+                        elif m.type == "GPU_MEMORY_REQUEST_BYTES":
+                            # Static value - GPU memory request in GB
+                            gpu_memory_gb = peak * (1/(1024**3))
+                            metrics["gpu_memory_request_gb"] = max(metrics["gpu_memory_request_gb"], gpu_memory_gb)
+                        elif m.type == "CPU_LIMIT_CORES":
+                            # Static value - CPU limit in cores
+                            metrics["cpu_limit_cores"] = max(metrics["cpu_limit_cores"], peak)
+                        elif m.type == "CPU_MEMORY_REQUEST_BYTES":
+                            # Static value - CPU memory request in GB
+                            metrics["cpu_memory_request_gb"] = max(metrics["cpu_memory_request_gb"], peak * (1/(1024**3)))
+                        elif m.type == "CPU_MEMORY_LIMIT_BYTES":
+                            # Static value - CPU memory limit in GB
+                            metrics["cpu_memory_limit_gb"] = max(metrics["cpu_memory_limit_gb"], peak * (1/(1024**3)))
+                        elif m.type == "POD_COUNT":
+                            # Static value - number of pods requested
+                            metrics["pod_count"] = max(metrics["pod_count"], peak)
+                        elif m.type == "RUNNING_POD_COUNT":
+                            # Dynamic value - running pod count
+                            metrics["running_pod_count_peak"] = max(metrics["running_pod_count_peak"], peak)
+                            metrics["running_pod_count_avg"] = weighted_avg
 
             except Exception as e:
                 print(f"Error processing window {window}: {e}")
@@ -250,6 +317,8 @@ def process_workload(client, workload: dict, start_date: datetime, end_date: dat
         "metrics": metrics
     }
 
+
+# Handle ThreadedApiClient response
 def get_response_data(apply_result):
     """Handle ThreadedApiClient response"""
     try:
@@ -265,34 +334,109 @@ def get_response_data(apply_result):
         print(f"Error extracting data from response: {e}")
         return {}
 
+
+# Get the cluster version
+def get_cluster_version(client):
+    """Retrieve cluster version from Run:AI"""
+    try:
+        clusters_response = client.organizations.clusters.get_clusters()
+        clusters_data = clusters_response.get().data
+        return clusters_data[0].get('version', 'Unknown')
+    except:
+        return 'Unknown'
+
+
+# Set the metrics types based on the cluster version
+def set_metrics_types(cluster_version):
+    """Set the metrics types based on the cluster version"""
+    # Check for unsupported newer versions
+    if isinstance(cluster_version, str) and (cluster_version.startswith('2.23')):
+        print(f"⚠️  Warning: Run:AI version {cluster_version} is not supported. "
+              f"Please upgrade this script as 2.23 and newer versions are not supported.")
+        # Fall back to basic metrics
+        return []
+    elif isinstance(cluster_version, str) and cluster_version.startswith(('2.20', '2.21', '2.22')):
+        return [
+            "GPU_ALLOCATION",
+            "GPU_UTILIZATION",
+            "GPU_MEMORY_USAGE_BYTES",
+            "CPU_REQUEST_CORES",
+            "CPU_USAGE_CORES",
+            "CPU_MEMORY_USAGE_BYTES",
+            "GPU_MEMORY_REQUEST_BYTES",
+            "CPU_LIMIT_CORES",
+            "CPU_MEMORY_REQUEST_BYTES",
+            "CPU_MEMORY_LIMIT_BYTES",
+            "POD_COUNT",
+            "RUNNING_POD_COUNT"
+        ]
+    else:
+        # Default metrics for older versions
+        return [
+            "GPU_ALLOCATION",
+            "GPU_UTILIZATION",
+            "GPU_MEMORY_USAGE_BYTES",
+            "CPU_REQUEST_CORES",
+            "CPU_USAGE_CORES",
+            "CPU_MEMORY_USAGE_BYTES"
+        ]
+
+
+# Set the metrics config based on the cluster version
+def set_metrics_config(cluster_version):
+    """Set the metrics config based on the cluster version"""
+    # Check for unsupported newer versions
+    if isinstance(cluster_version, str) and (cluster_version.startswith('2.23')):
+        # Fall back to basic metrics config
+        return {}
+    elif isinstance(cluster_version, str) and cluster_version.startswith(('2.20', '2.21', '2.22')):
+        return {
+            "GPU_ALLOCATION": WorkloadMetric(type="GPU_ALLOCATION", is_static_value=True),
+            "CPU_REQUEST_CORES": WorkloadMetric(type="CPU_REQUEST_CORES", is_static_value=True),
+            "CPU_USAGE_CORES": WorkloadMetric(type="CPU_USAGE_CORES"),
+            "GPU_UTILIZATION": WorkloadMetric(type="GPU_UTILIZATION"),
+            "GPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="GPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
+            "GPU_MEMORY_REQUEST_BYTES": WorkloadMetric(type="GPU_MEMORY_REQUEST_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
+            "CPU_LIMIT_CORES": WorkloadMetric(type="CPU_LIMIT_CORES", is_static_value=True),
+            "CPU_MEMORY_REQUEST_BYTES": WorkloadMetric(type="CPU_MEMORY_REQUEST_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
+            "CPU_MEMORY_LIMIT_BYTES": WorkloadMetric(type="CPU_MEMORY_LIMIT_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
+            "POD_COUNT": WorkloadMetric(type="POD_COUNT", is_static_value=True),
+            "RUNNING_POD_COUNT": WorkloadMetric(type="RUNNING_POD_COUNT"),
+        }
+    else:
+        # Default config for older versions
+        return {
+            "GPU_ALLOCATION": WorkloadMetric(type="GPU_ALLOCATION", is_static_value=True),
+            "CPU_REQUEST_CORES": WorkloadMetric(type="CPU_REQUEST_CORES", is_static_value=True),
+            "CPU_USAGE_CORES": WorkloadMetric(type="CPU_USAGE_CORES"),
+            "GPU_UTILIZATION": WorkloadMetric(type="GPU_UTILIZATION"),
+            "CPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="CPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
+            "GPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="GPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
+        }
+
+
 def main():
-    # Get environment variables with defaults
-    client_id = os.getenv('CLIENT_ID')
-    client_secret = os.getenv('CLIENT_SECRET')
-    base_url = os.getenv('BASE_URL')
+    # Login to Run:AI
+    client = login()
+
+    # Set the output directory, defaults to /mnt/data
     output_dir = os.getenv('OUTPUT_DIR', '/mnt/data') 
-    end_date=datetime.datetime.strptime(os.getenv('END_DATE'),'%d-%m-%Y').replace(tzinfo=datetime.timezone.utc) if os.getenv('END_DATE') else datetime.datetime.now(datetime.timezone.utc)
-    start_date=datetime.datetime.strptime(os.getenv('START_DATE'),'%d-%m-%Y').replace(tzinfo=datetime.timezone.utc) if os.getenv('START_DATE') else end_date - datetime.timedelta(days=7)
-
-    if not all([client_id, client_secret, base_url]):
-        raise ValueError("Missing required environment variables: CLIENT_ID, CLIENT_SECRET, and BASE_URL must be set")
-
-    # Initialize Run:AI client
-    config = Configuration(
-        client_id=client_id,
-        client_secret=client_secret,
-        runai_base_url=base_url
-    )
-
-    client = RunaiClient(ThreadedApiClient(config))
 
     # Define the time range
-    #end_date = datetime.datetime.now(datetime.timezone.utc)
-    #start_date = end_date - datetime.timedelta(days=7)
-    end = end_date.isoformat()
-    start = start_date.isoformat()
-
-    print(f"Analyzing data from {start} to {end}")
+    if os.getenv('END_DATE'):
+        end_date = datetime.datetime.strptime(os.getenv('END_DATE'), '%d-%m-%Y').replace(tzinfo=datetime.timezone.utc)
+    else:
+        end_date = datetime.datetime.now(datetime.timezone.utc)
+    
+    if os.getenv('START_DATE'):
+        start_date = datetime.datetime.strptime(os.getenv('START_DATE'), '%d-%m-%Y').replace(tzinfo=datetime.timezone.utc)
+    else:
+        start_date = end_date - datetime.timedelta(days=7)
+    
+    # Get cluster version information and print
+    print("Retrieving cluster version information...")
+    cluster_version = get_cluster_version(client)
+    print(f"Cluster version: {cluster_version}")
 
     # Fetch workloads data
     try:
@@ -309,23 +453,13 @@ def main():
     start_str = start_date.strftime(date_format)
     end_str = end_date.strftime(date_format)
 
-    metrics_types = [
-        "GPU_ALLOCATION",
-        "GPU_UTILIZATION",
-        "GPU_MEMORY_USAGE_BYTES",
-        "CPU_REQUEST_CORES",
-        "CPU_USAGE_CORES",
-        "CPU_MEMORY_USAGE_BYTES"
-    ]
+    print(f"Analyzing data from {start_str} to {end_str}")
 
-    metrics_config = {
-        "GPU_ALLOCATION": WorkloadMetric(type="GPU_ALLOCATION", is_static_value=True),
-        "CPU_REQUEST_CORES": WorkloadMetric(type="CPU_REQUEST_CORES", is_static_value=True),
-        "CPU_USAGE_CORES": WorkloadMetric(type="CPU_USAGE_CORES"),
-        "GPU_UTILIZATION": WorkloadMetric(type="GPU_UTILIZATION"),
-        "CPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="CPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
-        "GPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="GPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
-    }
+    # Metrics types for version 2.20, 2.21, 2.22
+    metrics_types = set_metrics_types(cluster_version)
+
+    # Metrics config for version 2.20, 2.21, 2.22
+    metrics_config = set_metrics_config(cluster_version)
 
     # Define filenames with full paths
     allocation_filename = os.path.join(output_dir, f"project_allocations_{start_str}_to_{end_str}.csv")
@@ -345,9 +479,22 @@ def main():
         "CPU Memory (GB) - Peak",
         "CPU Memory (GB) - Avg",
         "CPU (# Cores) - Peak",
-        "CPU (# Cores) - Avg"
+        "CPU (# Cores) - Avg",
+        "GPU Memory Request (GB) - Peak",
+        "GPU Memory Request (GB) - Avg",
+        "CPU Limit (Cores) - Peak",
+        "CPU Limit (Cores) - Avg",
+        "CPU Memory Request (GB) - Peak",
+        "CPU Memory Request (GB) - Avg",
+        "CPU Memory Limit (GB) - Peak",
+        "CPU Memory Limit (GB) - Avg",
+        "Pod Count - Peak",
+        "Pod Count - Avg",
+        "Running Pod Count - Peak",
+        "Running Pod Count - Avg"
     ]
 
+    # Utilization headers
     utilization_headers = [
         "Project",
         "User",
@@ -361,9 +508,17 @@ def main():
         "CPU Utilization (Cores) - Peak",
         "CPU Utilization (Cores) - Average",
         "CPU Memory (GB) - Peak",
-        "CPU Memory (GB) - Average"
+        "CPU Memory (GB) - Average",
+        "GPU Memory Request (GB)",
+        "CPU Limit (Cores)",
+        "CPU Memory Request (GB)",
+        "CPU Memory Limit (GB)",
+        "Pod Count",
+        "Running Pod Count - Peak",
+        "Running Pod Count - Average"
     ]
 
+    # Suspicious headers
     suspicious_headers = [
         "Project",
         "Job Name",
@@ -375,7 +530,6 @@ def main():
     ]
 
     project_data = {}
-    suspicious_data = []
 
     # Calculate optimal number of workers for workload processing
     workload_workers = max(1, min(5, multiprocessing.cpu_count()))
@@ -432,14 +586,22 @@ def main():
                         "CPU Utilization (Cores) - Peak": f"{metrics['cpu_utilization_peak']:.2f}",
                         "CPU Utilization (Cores) - Average": f"{metrics['cpu_utilization_avg']:.2f}",
                         "CPU Memory (GB) - Peak": f"{metrics['cpu_memory_peak']:.2f}",
-                        "CPU Memory (GB) - Average": f"{metrics['cpu_memory_avg']:.2f}"
+                        "CPU Memory (GB) - Average": f"{metrics['cpu_memory_avg']:.2f}",
+                        # New metrics for versions 2.20+
+                        "GPU Memory Request (GB)": f"{metrics['gpu_memory_request_gb']:.2f}",
+                        "CPU Limit (Cores)": f"{metrics['cpu_limit_cores']:.2f}",
+                        "CPU Memory Request (GB)": f"{metrics['cpu_memory_request_gb']:.2f}",
+                        "CPU Memory Limit (GB)": f"{metrics['cpu_memory_limit_gb']:.2f}",
+                        "Pod Count": f"{metrics['pod_count']:.0f}",
+                        "Running Pod Count - Peak": f"{metrics['running_pod_count_peak']:.0f}",
+                        "Running Pod Count - Average": f"{metrics['running_pod_count_avg']:.2f}"
                     })
 
                     # Process project data
                     project_name = workload.get('projectName', 'Unknown')
                     if project_name not in project_data:
                         project_data[project_name] = {
-                            "Department": workload.get('department', 'Unknown'),
+                            "Department": workload.get('departmentName', 'Unknown'),
                             "Project": project_name,
                             "Project Allocated GPUs": 0,
                             "Allocated GPU - Peak": 0,
@@ -448,6 +610,18 @@ def main():
                             "CPU Memory (GB) - Avg": 0,
                             "CPU (# Cores) - Peak": 0,
                             "CPU (# Cores) - Avg": 0,
+                            "GPU Memory Request (GB) - Peak": 0,
+                            "GPU Memory Request (GB) - Avg": 0,
+                            "CPU Limit (Cores) - Peak": 0,
+                            "CPU Limit (Cores) - Avg": 0,
+                            "CPU Memory Request (GB) - Peak": 0,
+                            "CPU Memory Request (GB) - Avg": 0,
+                            "CPU Memory Limit (GB) - Peak": 0,
+                            "CPU Memory Limit (GB) - Avg": 0,
+                            "Pod Count - Peak": 0,
+                            "Pod Count - Avg": 0,
+                            "Running Pod Count - Peak": 0,
+                            "Running Pod Count - Avg": 0,
                             "count": 0
                         }
 
@@ -459,6 +633,19 @@ def main():
                     pd["CPU Memory (GB) - Avg"] = (pd["CPU Memory (GB) - Avg"] * pd["count"] + metrics["cpu_memory_avg"]) / (pd["count"] + 1)
                     pd["CPU (# Cores) - Peak"] = max(pd["CPU (# Cores) - Peak"], metrics["cpu_utilization_peak"])
                     pd["CPU (# Cores) - Avg"] = (pd["CPU (# Cores) - Avg"] * pd["count"] + metrics["cpu_utilization_avg"]) / (pd["count"] + 1)
+                    pd["GPU Memory Request (GB) - Peak"] = max(pd["GPU Memory Request (GB) - Peak"], metrics["gpu_memory_request_gb"])
+                    pd["GPU Memory Request (GB) - Avg"] = (pd["GPU Memory Request (GB) - Avg"] * pd["count"] + metrics["gpu_memory_request_gb"]) / (pd["count"] + 1)
+                    pd["CPU Limit (Cores) - Peak"] = max(pd["CPU Limit (Cores) - Peak"], metrics["cpu_limit_cores"])
+                    pd["CPU Limit (Cores) - Avg"] = (pd["CPU Limit (Cores) - Avg"] * pd["count"] + metrics["cpu_limit_cores"]) / (pd["count"] + 1)
+                    pd["CPU Memory Request (GB) - Peak"] = max(pd["CPU Memory Request (GB) - Peak"], metrics["cpu_memory_request_gb"])
+                    pd["CPU Memory Request (GB) - Avg"] = (pd["CPU Memory Request (GB) - Avg"] * pd["count"] + metrics["cpu_memory_request_gb"]) / (pd["count"] + 1)
+                    pd["CPU Memory Limit (GB) - Peak"] = max(pd["CPU Memory Limit (GB) - Peak"], metrics["cpu_memory_limit_gb"])
+                    pd["CPU Memory Limit (GB) - Avg"] = (pd["CPU Memory Limit (GB) - Avg"] * pd["count"] + metrics["cpu_memory_limit_gb"]) / (pd["count"] + 1)
+                    pd["Pod Count - Peak"] = max(pd["Pod Count - Peak"], metrics["pod_count"])
+                    pd["Pod Count - Avg"] = (pd["Pod Count - Avg"] * pd["count"] + metrics["pod_count"]) / (pd["count"] + 1)
+                    pd["Running Pod Count - Peak"] = max(pd["Running Pod Count - Peak"], metrics["running_pod_count_peak"])
+                    pd["Running Pod Count - Avg"] = (pd["Running Pod Count - Avg"] * pd["count"] + metrics["running_pod_count_avg"]) / (pd["count"] + 1)
+                    
                     pd["count"] += 1
 
                     # Check for suspicious patterns
