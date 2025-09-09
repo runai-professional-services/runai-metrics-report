@@ -335,84 +335,41 @@ def get_response_data(apply_result):
         return {}
 
 
-# Get the cluster version
-def get_cluster_version(client):
-    """Retrieve cluster version from Run:AI"""
-    try:
-        clusters_response = client.organizations.clusters.get_clusters()
-        clusters_data = clusters_response.get().data
-        return clusters_data[0].get('version', 'Unknown')
-    except:
-        return 'Unknown'
-
-
 # Set the metrics types based on the cluster version
-def set_metrics_types(cluster_version):
+def set_metrics_types():
     """Set the metrics types based on the cluster version"""
-    # Check for unsupported newer versions
-    if isinstance(cluster_version, str) and (cluster_version.startswith('2.23')):
-        print(f"⚠️  Warning: Run:AI version {cluster_version} is not supported. "
-              f"Please upgrade this script as 2.23 and newer versions are not supported.")
-        # Fall back to basic metrics
-        return []
-    elif isinstance(cluster_version, str) and cluster_version.startswith(('2.20', '2.21', '2.22')):
-        return [
-            "GPU_ALLOCATION",
-            "GPU_UTILIZATION",
-            "GPU_MEMORY_USAGE_BYTES",
-            "CPU_REQUEST_CORES",
-            "CPU_USAGE_CORES",
-            "CPU_MEMORY_USAGE_BYTES",
-            "GPU_MEMORY_REQUEST_BYTES",
-            "CPU_LIMIT_CORES",
-            "CPU_MEMORY_REQUEST_BYTES",
-            "CPU_MEMORY_LIMIT_BYTES",
-            "POD_COUNT",
-            "RUNNING_POD_COUNT"
-        ]
-    else:
-        # Default metrics for older versions
-        return [
-            "GPU_ALLOCATION",
-            "GPU_UTILIZATION",
-            "GPU_MEMORY_USAGE_BYTES",
-            "CPU_REQUEST_CORES",
-            "CPU_USAGE_CORES",
-            "CPU_MEMORY_USAGE_BYTES"
-        ]
+    return [
+        "GPU_ALLOCATION",
+        "GPU_UTILIZATION",
+        "GPU_MEMORY_USAGE_BYTES",
+        "CPU_REQUEST_CORES",
+        "CPU_USAGE_CORES",
+        "CPU_MEMORY_USAGE_BYTES",
+        "GPU_MEMORY_REQUEST_BYTES",
+        "CPU_LIMIT_CORES",
+        "CPU_MEMORY_REQUEST_BYTES",
+        "CPU_MEMORY_LIMIT_BYTES",
+        "POD_COUNT",
+        "RUNNING_POD_COUNT"
+    ]
 
 
 # Set the metrics config based on the cluster version
-def set_metrics_config(cluster_version):
+def set_metrics_config():
     """Set the metrics config based on the cluster version"""
-    # Check for unsupported newer versions
-    if isinstance(cluster_version, str) and (cluster_version.startswith('2.23')):
-        # Fall back to basic metrics config
-        return {}
-    elif isinstance(cluster_version, str) and cluster_version.startswith(('2.20', '2.21', '2.22')):
-        return {
-            "GPU_ALLOCATION": WorkloadMetric(type="GPU_ALLOCATION", is_static_value=True),
-            "CPU_REQUEST_CORES": WorkloadMetric(type="CPU_REQUEST_CORES", is_static_value=True),
-            "CPU_USAGE_CORES": WorkloadMetric(type="CPU_USAGE_CORES"),
-            "GPU_UTILIZATION": WorkloadMetric(type="GPU_UTILIZATION"),
-            "GPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="GPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
-            "GPU_MEMORY_REQUEST_BYTES": WorkloadMetric(type="GPU_MEMORY_REQUEST_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
-            "CPU_LIMIT_CORES": WorkloadMetric(type="CPU_LIMIT_CORES", is_static_value=True),
-            "CPU_MEMORY_REQUEST_BYTES": WorkloadMetric(type="CPU_MEMORY_REQUEST_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
-            "CPU_MEMORY_LIMIT_BYTES": WorkloadMetric(type="CPU_MEMORY_LIMIT_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
-            "POD_COUNT": WorkloadMetric(type="POD_COUNT", is_static_value=True),
-            "RUNNING_POD_COUNT": WorkloadMetric(type="RUNNING_POD_COUNT"),
-        }
-    else:
-        # Default config for older versions
-        return {
-            "GPU_ALLOCATION": WorkloadMetric(type="GPU_ALLOCATION", is_static_value=True),
-            "CPU_REQUEST_CORES": WorkloadMetric(type="CPU_REQUEST_CORES", is_static_value=True),
-            "CPU_USAGE_CORES": WorkloadMetric(type="CPU_USAGE_CORES"),
-            "GPU_UTILIZATION": WorkloadMetric(type="GPU_UTILIZATION"),
-            "CPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="CPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
-            "GPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="GPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
-        }
+    return {
+        "GPU_ALLOCATION": WorkloadMetric(type="GPU_ALLOCATION", is_static_value=True),
+        "CPU_REQUEST_CORES": WorkloadMetric(type="CPU_REQUEST_CORES", is_static_value=True),
+        "CPU_USAGE_CORES": WorkloadMetric(type="CPU_USAGE_CORES"),
+        "GPU_UTILIZATION": WorkloadMetric(type="GPU_UTILIZATION"),
+        "GPU_MEMORY_USAGE_BYTES": WorkloadMetric(type="GPU_MEMORY_USAGE_BYTES", conversion_factor=1/(1024**3)),
+        "GPU_MEMORY_REQUEST_BYTES": WorkloadMetric(type="GPU_MEMORY_REQUEST_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
+        "CPU_LIMIT_CORES": WorkloadMetric(type="CPU_LIMIT_CORES", is_static_value=True),
+        "CPU_MEMORY_REQUEST_BYTES": WorkloadMetric(type="CPU_MEMORY_REQUEST_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
+        "CPU_MEMORY_LIMIT_BYTES": WorkloadMetric(type="CPU_MEMORY_LIMIT_BYTES", is_static_value=True, conversion_factor=1/(1024**3)),
+        "POD_COUNT": WorkloadMetric(type="POD_COUNT", is_static_value=True),
+        "RUNNING_POD_COUNT": WorkloadMetric(type="RUNNING_POD_COUNT"),
+    }
 
 
 def main():
@@ -432,11 +389,6 @@ def main():
         start_date = datetime.datetime.strptime(os.getenv('START_DATE'), '%d-%m-%Y').replace(tzinfo=datetime.timezone.utc)
     else:
         start_date = end_date - datetime.timedelta(days=7)
-    
-    # Get cluster version information and print
-    print("Retrieving cluster version information...")
-    cluster_version = get_cluster_version(client)
-    print(f"Cluster version: {cluster_version}")
 
     # Fetch workloads data
     try:
@@ -456,10 +408,10 @@ def main():
     print(f"Analyzing data from {start_str} to {end_str}")
 
     # Metrics types for version 2.20, 2.21, 2.22
-    metrics_types = set_metrics_types(cluster_version)
+    metrics_types = set_metrics_types()
 
     # Metrics config for version 2.20, 2.21, 2.22
-    metrics_config = set_metrics_config(cluster_version)
+    metrics_config = set_metrics_config()
 
     # Define filenames with full paths
     allocation_filename = os.path.join(output_dir, f"project_allocations_{start_str}_to_{end_str}.csv")
