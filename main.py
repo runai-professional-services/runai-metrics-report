@@ -372,13 +372,13 @@ def set_metrics_config():
     }
 
 
-def main():
-    # Login to Run:AI
-    client = login()
-
-    # Set the output directory, defaults to /mnt/data
-    output_dir = os.getenv('OUTPUT_DIR', '/mnt/data') 
-
+def get_time_range():
+    """
+    Get the time range for data collection from environment variables.
+    
+    Returns:
+        tuple: (start_date, end_date) as datetime objects with UTC timezone
+    """
     # Define the time range
     if os.getenv('END_DATE'):
         end_date = datetime.datetime.strptime(os.getenv('END_DATE'), '%d-%m-%Y').replace(tzinfo=datetime.timezone.utc)
@@ -389,15 +389,44 @@ def main():
         start_date = datetime.datetime.strptime(os.getenv('START_DATE'), '%d-%m-%Y').replace(tzinfo=datetime.timezone.utc)
     else:
         start_date = end_date - datetime.timedelta(days=7)
+    
+    return start_date, end_date
 
-    # Fetch workloads data
+
+def fetch_workloads_data(client):
+    """
+    Fetch workloads data from the Run:AI client.
+    
+    Args:
+        client: The Run:AI client instance
+        
+    Returns:
+        list: List of workloads data, or None if an error occurred
+    """
     try:
         response = client.workloads.workloads.get_workloads()
         response_data = get_response_data(response)
         workloads_data = response_data.get('workloads', [])
         print(f"Total Workloads Found: {len(workloads_data)}")
+        return workloads_data
     except Exception as e:
         print(f"Error fetching workloads: {e}")
+        return None
+
+
+def main():
+    # Login to Run:AI
+    client = login()
+
+    # Set the output directory, defaults to /mnt/data
+    output_dir = os.getenv('OUTPUT_DIR', '/mnt/data') 
+
+    # Get the time range
+    start_date, end_date = get_time_range()
+
+    # Fetch workloads data
+    workloads_data = fetch_workloads_data(client)
+    if workloads_data is None:
         return
 
     # Format dates for filenames
