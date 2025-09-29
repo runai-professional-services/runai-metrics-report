@@ -48,11 +48,11 @@ export CLIENT_SECRET="your_client_secret"
 export BASE_URL="your_base_url"
 ```
 
-**Optional** environment variables to set the date range for metric collection. If the environment variables are not defined the default is the last `7` days. 
+**Optional** environment variables to set the date range for metric collection. If the environment variables are not defined the default is the last `7` days. The date formate is `%d-%m-%Y`
 
 ```bash
-export START_DATE = "01-01-2025"
-export END_DATE = "02-01-2025"
+export START_DATE="01-01-2025"
+export END_DATE="02-01-2025"
 ```
 
 ## Output Files
